@@ -13,6 +13,7 @@ import tempfile
 import threading
 import time
 import urllib.request
+import traceback
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -22,6 +23,26 @@ ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "91b75df"
 MANIFEST_URL = "https://raw.githubusercontent.com/interforever90/image-motion-tool/main/version.json"
 OLD_URL = "https://github.com/interforever90/image-motion-tool/releases/download/v5.14/ImageMotionTool_V5_14.exe"
+
+
+def report(text):
+    print(text, flush=True)
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as output:
+            output.write(text + "\n\n")
+
+
+def probe_cmd_endings(directory):
+    for label, ending in (("CR-only legacy", "\r"), ("CRLF", "\r\n")):
+        script = directory / "probe.bat"
+        script.write_bytes(ending.join([
+            "@echo off", "echo LINE_ONE", "echo LINE_TWO", "exit /b 0", "",
+        ]).encode("ascii"))
+        result = subprocess.run(["cmd", "/d", "/c", str(script)],
+                                capture_output=True, text=True, timeout=10)
+        report(f"CMD probe {label}: exit {result.returncode}; "
+               f"stdout={result.stdout!r}; stderr={result.stderr!r}")
 
 
 def digest(path):
@@ -52,6 +73,7 @@ def main():
     module = ast.fix_missing_locations(ast.Module(body=[legacy_cls], type_ignores=[]))
     with tempfile.TemporaryDirectory(prefix="imt-upgrade-") as directory:
         work = Path(directory)
+        probe_cmd_endings(work)
         installed = work / "ImageMotionTool.exe"
         urllib.request.urlretrieve(OLD_URL, installed)
         original_hash = digest(installed)
@@ -88,10 +110,12 @@ def main():
                 if old.poll() is not None or time.monotonic() > deadline:
                     raise RuntimeError("Original released V5.14 GUI did not start")
                 time.sleep(0.5)
+            report("Released V5.14 GUI started successfully")
             exec(compile(module, "legacy-v5.14-updater", "exec"), namespace)
             updater = namespace["LegacyUpdater"]()
             updater.root = SimpleNamespace(after=after, destroy=lambda: stop(old))
             updater.check_update()
+            report("Original baseline updater started")
             deadline = time.monotonic() + 240
             while time.monotonic() < deadline:
                 if errors:
@@ -106,6 +130,9 @@ def main():
             else:
                 bat = work / "ImageMotionTool_apply_update.bat"
                 endings = "missing BAT" if not bat.exists() else repr(bat.read_bytes()[-100:])
+                new_copy = work / "ImageMotionToolUpdater" / "ImageMotionTool_NEW.exe"
+                report(f"Old process exit: {old.poll()}; installed changed: "
+                       f"{digest(installed) != original_hash}; download remains: {new_copy.exists()}")
                 raise RuntimeError("Legacy V5.14 updater did not restart V5.15; BAT tail: " + endings)
         finally:
             for thread in updater_threads:
@@ -118,4 +145,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        report(f"::error::{type(error).__name__}: {error}")
+        report("```text\n" + traceback.format_exc() + "```")
+        raise

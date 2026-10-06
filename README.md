@@ -72,6 +72,9 @@ il manifest pubblico, scarica la V5.15, esegue il vecchio BAT senza modificarlo,
 sostituisce l'EXE e verifica il riavvio della GUI V5.15. Il test conferma
 automaticamente le finestre di dialogo e simula la chiusura della vecchia GUI;
 non automatizza i click nella V5.14 già installata sul PC dell'utente.
+Per ripetere solo il controllo della compatibilità dopo una modifica alla pipeline,
+un commit su `main` con `[verify-updater]` nel messaggio abilita nuovamente il job
+dopo la build. I dettagli diagnostici sono disponibili nel riepilogo del job.
 
 Non modificare `version.json` prima della disponibilità dell'eseguibile: la V5.14
 legge questo file per proporre e scaricare l'aggiornamento. Il nome dell'asset

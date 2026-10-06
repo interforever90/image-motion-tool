@@ -74,8 +74,12 @@ jobs:
         run: python scripts/publish_release.py
 
   verify-update:
-    if: github.ref == 'refs/tags/v5.15'
-    needs: release
+    if: >-
+      always() && needs.build.result == 'success' &&
+      ((github.ref == 'refs/tags/v5.15' && needs.release.result == 'success') ||
+       (github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+        contains(github.event.head_commit.message, '[verify-updater]')))
+    needs: [build, release]
     runs-on: windows-2022
     timeout-minutes: 15
     steps:
