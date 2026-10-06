@@ -5,7 +5,8 @@ Applicazione desktop Python/Tkinter per generare video da immagini tramite FFmpe
 ## Build automatica Windows
 
 Il workflow `Build Windows executable` parte a ogni push su `main`, nelle pull
-request verso `main` e manualmente da **Actions → Build Windows executable → Run workflow**.
+request verso `main`, al push di tag `v*` e manualmente da
+**Actions → Build Windows executable → Run workflow**.
 Usa Windows Server 2022 x64, Python 3.12 e PyInstaller con dipendenze fissate.
 
 Al termine scaricare l'artifact **ImageMotionTool-Windows-x64** dalla pagina del run
@@ -46,6 +47,32 @@ e al README upstream, quando presente nell'archivio.
 Conservare gli avvisi e rispettare gli obblighi GPL e di disponibilità dei sorgenti
 quando si redistribuisce FFmpeg, anche se incluso nell'eseguibile.
 
-Il workflow produce artifact, non pubblica GitHub Releases e non modifica
-`version.json`: l'URL dell'aggiornamento resta quello esistente. L'eseguibile
-generato non è firmato digitalmente.
+L'eseguibile generato non è firmato digitalmente.
+
+## Pubblicare una versione
+
+1. Aggiornare `APP_VERSION` nel sorgente e aggiungere le note in
+   `release-notes/<versione>.md`, ad esempio `release-notes/5.15.md`.
+2. Fare commit e push su `main`, poi creare e inviare il tag corrispondente:
+   `git tag v5.15` e `git push origin v5.15`.
+3. Il workflow compila e verifica l'eseguibile del tag, pubblica una GitHub Release
+   con `ImageMotionTool.exe` e `FFmpeg-notices.zip`, poi aggiorna `version.json`
+   su `main` con versione, note e URL della release pubblicata.
+
+Il job di pubblicazione usa `GITHUB_TOKEN` con `contents: write`; gli altri job
+hanno soltanto permessi di lettura. Eventuali protezioni di `main` devono consentire
+il commit del manifest dal bot. Se il push del manifest è bloccato, la release
+può esistere ma l'app non riceve ancora l'aggiornamento: il workflow segnala errore.
+La pubblicazione può essere ripetuta senza sostituire gli asset di una release
+già pubblicata. La versione del tag deve corrispondere ad `APP_VERSION` su `main`.
+
+Per il tag `v5.15` viene eseguito anche un controllo Windows dell'aggiornamento:
+parte l'EXE pubblico V5.14 e il codice updater originale della baseline legge
+il manifest pubblico, scarica la V5.15, esegue il vecchio BAT senza modificarlo,
+sostituisce l'EXE e verifica il riavvio della GUI V5.15. Il test conferma
+automaticamente le finestre di dialogo e simula la chiusura della vecchia GUI;
+non automatizza i click nella V5.14 già installata sul PC dell'utente.
+
+Non modificare `version.json` prima della disponibilità dell'eseguibile: la V5.14
+legge questo file per proporre e scaricare l'aggiornamento. Il nome dell'asset
+rimane stabile (`ImageMotionTool.exe`), mentre la versione è interna all'app.

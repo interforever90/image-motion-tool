@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def application_window_exists():
+def application_window_exists(version=None):
     titles = []
     callback_type = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
     user32 = ctypes.windll.user32
@@ -29,7 +29,8 @@ def application_window_exists():
 
     if not user32.EnumWindows(visit, 0):
         raise RuntimeError("Unable to enumerate application windows")
-    return any(title.startswith("Image Motion Tool ") for title in titles)
+    prefix = "Image Motion Tool " if version is None else f"Image Motion Tool {version} —"
+    return any(title.startswith(prefix) for title in titles)
 
 
 def main():
