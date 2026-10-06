@@ -67,7 +67,11 @@ def main():
         command("gh", "release", "edit", tag, "--repo", REPOSITORY,
                 "--notes-file", str(note_file))
     if is_draft:
-        command("gh", "release", "upload", tag, str(executable), notice_zip,
+        assets_to_upload = [str(executable), notice_zip]
+        preview = ROOT / "dist" / "interface.png"
+        if preview.is_file():
+            assets_to_upload.append(str(preview))
+        command("gh", "release", "upload", tag, *assets_to_upload,
                 "--repo", REPOSITORY, "--clobber")
         command("gh", "release", "edit", tag, "--repo", REPOSITORY,
                 "--draft=false", "--latest")

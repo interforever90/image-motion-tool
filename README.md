@@ -2,6 +2,14 @@
 
 Applicazione desktop Python/Tkinter per generare video da immagini tramite FFmpeg.
 
+La V5.16 introduce un'interfaccia scura con accenti turchesi e sezioni separate
+per immagini, movimento, video ed esportazione. La durata è un campo libero:
+si possono scegliere 15, 30, 60 o 120 secondi, oppure digitare un altro valore.
+La durata iniziale resta 7 secondi; solo l'anteprima è limitata a 5 secondi.
+La CI verifica anche la generazione di un MP4 di 15 secondi tramite i filtri
+originali dell'applicazione. La release include `interface.png` come anteprima
+dell'interfaccia; per utilizzare l'app basta l'eseguibile standalone.
+
 ## Build automatica Windows
 
 Il workflow `Build Windows executable` parte a ogni push su `main`, nelle pull

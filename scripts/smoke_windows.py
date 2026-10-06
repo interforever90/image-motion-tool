@@ -22,7 +22,18 @@ def check_long_duration(ffmpeg, work):
     root.withdraw()
     try:
         app = App(root)
+        root.deiconify()
         root.update_idletasks()
+        def check_widgets(parent):
+            for widget in parent.winfo_children():
+                if isinstance(widget, (tk.Listbox,)) or widget.winfo_class() in ("TButton", "TEntry", "TCombobox"):
+                    x = widget.winfo_rootx() - root.winfo_rootx()
+                    y = widget.winfo_rooty() - root.winfo_rooty()
+                    assert 0 <= x and x + widget.winfo_width() <= root.winfo_width(), str(widget)
+                    assert 0 <= y and y + widget.winfo_height() <= root.winfo_height(), str(widget)
+                check_widgets(widget)
+        check_widgets(root)
+        root.withdraw()
         app.duration.set("15")
         app.res.set("64x64")
         app.fps.set("24")
