@@ -1,5 +1,5 @@
 {
-  "version": "5.14",
-  "download_url": "https://github.com/interforever90/image-motion-tool/releases/download/v5.14/ImageMotionTool_V5_14.exe",
-  "notes": "V5.14 - Nuovo sistema di aggiornamento con sostituzione e riavvio automatici."
+  "version": "5.15",
+  "download_url": "https://github.com/interforever90/image-motion-tool/releases/download/v5.15/ImageMotionTool.exe",
+  "notes": "V5.15 - Prima build automatica Windows standalone con FFmpeg incluso. Corretti i terminatori CRLF del BAT di aggiornamento. Rendering, effetti e preset invariati rispetto alla V5.14."
 }
