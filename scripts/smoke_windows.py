@@ -23,7 +23,14 @@ def check_long_duration(ffmpeg, work):
     try:
         app = App(root)
         root.deiconify()
-        root.update_idletasks()
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            root.update()
+            if app.listbox.winfo_ismapped() and app.listbox.winfo_width() > 1:
+                break
+            time.sleep(0.05)
+        else:
+            raise RuntimeError("Source UI did not finish mapping before layout validation")
         def check_widgets(parent):
             for widget in parent.winfo_children():
                 if isinstance(widget, (tk.Listbox,)) or widget.winfo_class() in ("TButton", "TEntry", "TCombobox"):
