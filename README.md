@@ -67,9 +67,10 @@ La pubblicazione può essere ripetuta senza sostituire gli asset di una release
 già pubblicata. La versione del tag deve corrispondere ad `APP_VERSION` su `main`.
 
 Per il tag `v5.15` viene eseguito anche un controllo Windows dell'aggiornamento:
-parte l'EXE pubblico V5.14 e il codice updater originale della baseline legge
-il manifest pubblico, scarica la V5.15, esegue il vecchio BAT senza modificarlo,
-sostituisce l'EXE e verifica il riavvio della GUI V5.15. Il test conferma
+parte l'EXE pubblico V5.14 e i metodi updater estratti dall'eseguibile originale
+leggono il manifest pubblico, scaricano la V5.15 ed eseguono il vecchio BAT
+senza modificarlo. In caso di errore viene provato anche il BAT CRLF con il
+metodo estratto dall'EXE V5.15, verificando sostituzione e riavvio. Il test conferma
 automaticamente le finestre di dialogo e simula la chiusura della vecchia GUI;
 non automatizza i click nella V5.14 già installata sul PC dell'utente.
 Per ripetere solo il controllo della compatibilità dopo una modifica alla pipeline,

@@ -91,5 +91,10 @@ jobs:
           python-version: '3.12'
           architecture: x64
       - name: Verify V5.14 download, replacement and V5.15 restart
+        # Inspect packaged Python code without executing either application module.
+        # The application GUIs and updater methods are exercised separately.
         shell: pwsh
-        run: python scripts/verify_update_windows.py
+        run: |
+          python -m pip install -r requirements-build.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/verify_update_windows.py

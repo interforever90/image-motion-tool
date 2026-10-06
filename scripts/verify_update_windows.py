@@ -1,48 +1,34 @@
-"""Exercise the unchanged V5.14 updater with real released Windows executables.
+"""Test updater methods extracted from actual released Windows executables.
 
-The original GUI is closed by the harness when the legacy updater requests exit.
-No UI clicks, rendering changes or modifications to the old BAT are performed.
+Dialogs and GUI closure are simulated; the packaged updater and BAT stay intact.
 """
-
-import ast
 import hashlib
+import json
+import marshal
 import os
-import socket
+import queue
+import shutil
 import subprocess
 import tempfile
-import threading
 import time
-import urllib.request
 import traceback
+import types
+import urllib.request
 from pathlib import Path
-from types import SimpleNamespace
+from unittest.mock import patch
 
+from PyInstaller.archive.readers import CArchiveReader
 from smoke_windows import application_window_exists
 
-ROOT = Path(__file__).resolve().parents[1]
-BASELINE = "91b75df"
-MANIFEST_URL = "https://raw.githubusercontent.com/interforever90/image-motion-tool/main/version.json"
 OLD_URL = "https://github.com/interforever90/image-motion-tool/releases/download/v5.14/ImageMotionTool_V5_14.exe"
+NEW_URL = "https://github.com/interforever90/image-motion-tool/releases/download/v5.15/ImageMotionTool.exe"
 
 
 def report(text):
     print(text, flush=True)
-    summary = os.environ.get("GITHUB_STEP_SUMMARY")
-    if summary:
-        with open(summary, "a", encoding="utf-8") as output:
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
             output.write(text + "\n\n")
-
-
-def probe_cmd_endings(directory):
-    for label, ending in (("CR-only legacy", "\r"), ("CRLF", "\r\n")):
-        script = directory / "probe.bat"
-        script.write_bytes(ending.join([
-            "@echo off", "echo LINE_ONE", "echo LINE_TWO", "exit /b 0", "",
-        ]).encode("ascii"))
-        result = subprocess.run(["cmd", "/d", "/c", str(script)],
-                                capture_output=True, text=True, timeout=10)
-        report(f"CMD probe {label}: exit {result.returncode}; "
-               f"stdout={result.stdout!r}; stderr={result.stderr!r}")
 
 
 def digest(path):
@@ -56,89 +42,122 @@ def stop(process):
         process.wait(timeout=30)
 
 
+def packaged_methods(executable):
+    archive = CArchiveReader(str(executable))
+    if "python312.dll" not in archive.toc:
+        raise RuntimeError("Inspection requires the packaged Python 3.12 format")
+    entries = [name for name, entry in archive.toc.items()
+               if entry[-1] == "s" and name.startswith("image_motion_tool")]
+    assert len(entries) == 1, "Ambiguous application script"
+    module = marshal.loads(archive.extract(entries[0]))
+    methods = {}
+
+    def visit(code):
+        methods[code.co_name] = code
+        for constant in code.co_consts:
+            if isinstance(constant, types.CodeType):
+                visit(constant)
+
+    visit(module)
+    return methods
+
+
+def wait_for_upgrade(installed, old_hash, timeout):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if application_window_exists("5.15") and digest(installed) != old_hash:
+            return True
+        time.sleep(0.5)
+    return False
+
+
 def main():
     if os.name != "nt":
-        raise RuntimeError("The legacy updater verification requires Windows")
-    socket.setdefaulttimeout(90)
-    source = subprocess.check_output(
-        ["git", "show", f"{BASELINE}:image_motion_tool.py"], cwd=ROOT, text=True,
-        encoding="utf-8",
-    )
-    cls = next(node for node in ast.parse(source).body if isinstance(node, ast.ClassDef))
-    methods = [node for node in cls.body if isinstance(node, ast.FunctionDef)
-               and node.name in ("_version_tuple", "check_update", "apply_update")]
-    assert len(methods) == 3, "Missing legacy updater methods"
-    legacy_cls = ast.ClassDef(name="LegacyUpdater", bases=[], keywords=[], body=methods,
-                              decorator_list=[])
-    module = ast.fix_missing_locations(ast.Module(body=[legacy_cls], type_ignores=[]))
+        raise RuntimeError("Updater verification requires Windows")
     with tempfile.TemporaryDirectory(prefix="imt-upgrade-") as directory:
         work = Path(directory)
-        probe_cmd_endings(work)
         installed = work / "ImageMotionTool.exe"
-        urllib.request.urlretrieve(OLD_URL, installed)
-        original_hash = digest(installed)
+        with urllib.request.urlopen(OLD_URL, timeout=90) as response, installed.open("wb") as output:
+            shutil.copyfileobj(response, output)
+        old_hash = digest(installed)
+        original = packaged_methods(installed)
         old = subprocess.Popen([str(installed)], cwd=work)
-        errors = []
-        updater_threads = []
-
-        def start_thread(*args, **kwargs):
-            thread = threading.Thread(*args, **kwargs)
-            updater_threads.append(thread)
-            return thread
+        events = queue.Queue()
 
         def after(delay, callback):
-            if delay:
-                time.sleep(delay / 1000)
+            time.sleep(delay / 1000)
             callback()
 
+        app = types.SimpleNamespace(q=events, root=types.SimpleNamespace(
+            after=after, destroy=lambda: stop(old)))
         namespace = {
-            "APP_VERSION": "5.14", "VERSION_URL": MANIFEST_URL,
-            "Path": Path, "urllib": urllib,
-            "sys": SimpleNamespace(executable=str(installed)),
-            "tempfile": SimpleNamespace(gettempdir=lambda: str(work)),
-            "subprocess": subprocess,
-            "threading": SimpleNamespace(Thread=start_thread),
-            "messagebox": SimpleNamespace(
-                askyesno=lambda *args: True,
-                showerror=lambda title, message: errors.append(f"{title}: {message}"),
-                showinfo=lambda title, message: errors.append(f"{title}: {message}"),
-            ),
+            "Path": Path, "urllib": urllib, "json": json, "shutil": shutil,
+            "sys": types.SimpleNamespace(frozen=True, executable=str(installed)),
         }
+
+        def original_method(name, *args):
+            return types.FunctionType(original[name], namespace)(app, *args)
+
         try:
             deadline = time.monotonic() + 90
             while not application_window_exists("5.14"):
                 if old.poll() is not None or time.monotonic() > deadline:
-                    raise RuntimeError("Original released V5.14 GUI did not start")
+                    raise RuntimeError("Released V5.14 GUI did not start")
                 time.sleep(0.5)
             report("Released V5.14 GUI started successfully")
-            exec(compile(module, "legacy-v5.14-updater", "exec"), namespace)
-            updater = namespace["LegacyUpdater"]()
-            updater.root = SimpleNamespace(after=after, destroy=lambda: stop(old))
-            updater.check_update()
-            report("Original baseline updater started")
-            deadline = time.monotonic() + 240
-            while time.monotonic() < deadline:
-                if errors:
-                    raise RuntimeError("Legacy updater failed: " + "; ".join(errors))
-                if application_window_exists("5.15") and digest(installed) != original_hash:
-                    new_copy = work / "ImageMotionToolUpdater" / "ImageMotionTool_NEW.exe"
-                    assert not new_copy.exists(), "Update download was not moved into place"
-                    print("PASS: released V5.14 started; original updater downloaded the public "
-                          "V5.15 asset, replaced the EXE and restarted the V5.15 GUI")
-                    break
-                time.sleep(1)
-            else:
-                bat = work / "ImageMotionTool_apply_update.bat"
-                endings = "missing BAT" if not bat.exists() else repr(bat.read_bytes()[-100:])
-                new_copy = work / "ImageMotionToolUpdater" / "ImageMotionTool_NEW.exe"
-                report(f"Old process exit: {old.poll()}; installed changed: "
-                       f"{digest(installed) != original_hash}; download remains: {new_copy.exists()}")
-                raise RuntimeError("Legacy V5.14 updater did not restart V5.15; BAT tail: " + endings)
+            with patch.object(tempfile, "tempdir", str(work)):
+                original_method("_check_updates_worker")
+                event, manifest = events.get(timeout=10)
+                assert event == "updatecheck", (event, manifest)
+                assert manifest["version"] == "5.15" and manifest["download_url"] == NEW_URL
+                original_method("_download_update_worker", manifest["download_url"])
+                event, paths = events.get(timeout=10)
+                assert event == "autoupdateready", (event, paths)
+                current, staged_name = paths
+                staged = Path(staged_name)
+                new_hash = digest(staged)
+                new_methods = packaged_methods(staged)
+                report("::notice::Actual V5.14 updater read the public manifest and downloaded V5.15")
+                commands = []
+                real_popen = subprocess.Popen
+
+                def capture_popen(args, **kwargs):
+                    if args[0].lower() == "cmd.exe":
+                        kwargs.update(stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        process = real_popen(args, **kwargs)
+                        commands.append(process)
+                        return process
+                    return real_popen(args, **kwargs)
+
+                with patch.object(subprocess, "Popen", capture_popen):
+                    original_method("_launch_auto_replace", current, staged_name)
+                assert len(commands) == 1, "Missing original BAT process"
+                stdout, stderr = commands[0].communicate(timeout=45)
+                legacy_ok = wait_for_upgrade(installed, old_hash, 10)
+                if legacy_ok:
+                    assert digest(installed) == new_hash
+                    report("PASS: actual released V5.14 updater replaced the EXE and restarted V5.15")
+                    return
+                contents = (work / "ImageMotionTool_apply_update.bat").read_bytes()
+                cr_only = b"\r" in contents and b"\n" not in contents
+                report(f"::warning::Actual V5.14 BAT failed: CR-only={cr_only}, "
+                       f"exit={commands[0].returncode}, download remains={staged.exists()}, "
+                       f"installed unchanged={digest(installed) == old_hash}, "
+                       f"stdout={stdout!r}, stderr={stderr!r}")
+                assert staged.exists(), "Downloaded EXE missing after legacy failure"
+                assert digest(installed) == old_hash, "Legacy updater partially replaced the EXE"
+                fixed_namespace = dict(namespace, subprocess=subprocess, tempfile=tempfile,
+                    messagebox=types.SimpleNamespace(askyesno=lambda *args: True))
+                types.FunctionType(new_methods["apply_update"], fixed_namespace)(app, staged)
+                assert wait_for_upgrade(installed, old_hash, 30), "V5.15 CRLF updater failed"
+                assert digest(installed) == new_hash, "Updated executable differs from public V5.15"
+                report("::notice::PASS: actual V5.15 CRLF updater replaced the identical downloaded "
+                       "EXE and restarted the V5.15 GUI")
+                raise RuntimeError("Released V5.14 cannot complete the automatic upgrade with its "
+                                   "CR-only BAT. The V5.15 CRLF updater control passed. "
+                                   "A one-time manual installation of V5.15 is required.")
         finally:
-            for thread in updater_threads:
-                thread.join(timeout=100)
             stop(old)
-            # Only this harness launches an application of this name on this runner.
             subprocess.run(["taskkill", "/IM", "ImageMotionTool.exe", "/T", "/F"],
                            check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             time.sleep(1)
