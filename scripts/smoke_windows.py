@@ -27,12 +27,18 @@ def check_long_duration(ffmpeg, work):
         def check_widgets(parent):
             for widget in parent.winfo_children():
                 if isinstance(widget, (tk.Listbox,)) or widget.winfo_class() in ("TButton", "TEntry", "TCombobox"):
+                    in_scroll_panel = str(widget).startswith(str(app.settings_canvas) + ".")
                     x = widget.winfo_rootx() - root.winfo_rootx()
                     y = widget.winfo_rooty() - root.winfo_rooty()
-                    assert 0 <= x and x + widget.winfo_width() <= root.winfo_width(), str(widget)
-                    assert 0 <= y and y + widget.winfo_height() <= root.winfo_height(), str(widget)
+                    assert 0 <= x and x + widget.winfo_width() <= root.winfo_width(), f"{widget}: horizontal clipping ({x}, {widget.winfo_width()}, {root.winfo_width()})"
+                    if not in_scroll_panel:
+                        assert 0 <= y and y + widget.winfo_height() <= root.winfo_height(), f"{widget}: vertical clipping ({y}, {widget.winfo_height()}, {root.winfo_height()})"
                 check_widgets(widget)
         check_widgets(root)
+        app.settings_canvas.yview_moveto(1)
+        root.update_idletasks()
+        assert app.settings_canvas.yview()[1] >= 0.999, "Export controls cannot be reached by scrolling"
+        app.settings_canvas.yview_moveto(0)
         root.withdraw()
         app.duration.set("15")
         app.res.set("64x64")
@@ -119,4 +125,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        print(f"::error::{type(error).__name__}: {error}", flush=True)
+        raise

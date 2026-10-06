@@ -24,8 +24,10 @@ class App:
     def __init__(self, root):
         self.root=root
         root.title(f"Image Motion Tool {APP_VERSION} — Auto Updater")
-        root.geometry("1080x780")
-        root.minsize(980,740)
+        width=min(1080,max(960,root.winfo_screenwidth()-64))
+        height=min(780,max(640,root.winfo_screenheight()-96))
+        root.geometry(f"{width}x{height}")
+        root.minsize(960,640)
         self.images=[]
         self.current_process=None
         self.cancel_event=threading.Event()
@@ -120,8 +122,19 @@ class App:
         ttk.Button(edit,text="Rimuovi selezione",command=self.remove_selected).grid(row=0,column=0,sticky="ew",padx=(0,4))
         ttk.Button(edit,text="Svuota elenco",command=self.clear_images).grid(row=0,column=1,sticky="ew",padx=(4,0))
 
-        settings=ttk.Frame(content,style="Page.TFrame")
-        settings.grid(row=0,column=1,sticky="nsew")
+        settings_view=ttk.Frame(content,style="Page.TFrame")
+        settings_view.grid(row=0,column=1,sticky="nsew")
+        settings_view.columnconfigure(0,weight=1)
+        settings_view.rowconfigure(0,weight=1)
+        self.settings_canvas=tk.Canvas(settings_view,background="#0b1220",highlightthickness=0,width=1,height=1)
+        self.settings_canvas.grid(row=0,column=0,sticky="nsew")
+        settings_scroll=ttk.Scrollbar(settings_view,orient="vertical",command=self.settings_canvas.yview)
+        settings_scroll.grid(row=0,column=1,sticky="ns",padx=(8,0))
+        self.settings_canvas.configure(yscrollcommand=settings_scroll.set)
+        settings=ttk.Frame(self.settings_canvas,style="Page.TFrame")
+        settings_window=self.settings_canvas.create_window((0,0),window=settings,anchor="nw")
+        settings.bind("<Configure>",lambda _:self.settings_canvas.configure(scrollregion=self.settings_canvas.bbox("all")))
+        self.settings_canvas.bind("<Configure>",lambda event:self.settings_canvas.itemconfigure(settings_window,width=event.width))
         settings.columnconfigure(0,weight=1)
         movement=ttk.LabelFrame(settings,text="  Movimento e intensità  ",style="Card.TLabelframe",padding=(14,8))
         movement.grid(row=0,column=0,sticky="ew",pady=(0,12))
