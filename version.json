@@ -1,5 +1,5 @@
 {
-  "version": "5.10",
-  "download_url": "",
-  "notes": "Prima configurazione updater"
+  "version": "5.12",
+  "download_url": "https://github.com/interforever90/image-motion-tool/releases/download/v5.12/ImageMotionTool_V5_12.exe",
+  "notes": "V5.12 - Correzione sperimentale del Test Adattivo e sistema di aggiornamento."
 }
