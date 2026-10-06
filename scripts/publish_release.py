@@ -26,12 +26,13 @@ def app_version(source):
 
 
 def main():
-    tag = os.environ["RELEASE_TAG"]
+    current_source = (ROOT / "image_motion_tool.py").read_text(encoding="utf-8")
+    sync_notes = not os.environ["RELEASE_TAG"]
+    tag = os.environ["RELEASE_TAG"] or f"v{app_version(current_source)}"
     if not re.fullmatch(r"v[0-9]+(?:\.[0-9]+)+", tag):
         raise RuntimeError("Release tag must have the form v5.15")
     version = tag[1:]
     tagged_source = command("git", "show", f"{tag}:image_motion_tool.py")
-    current_source = (ROOT / "image_motion_tool.py").read_text(encoding="utf-8")
     if app_version(tagged_source) != version or app_version(current_source) != version:
         raise RuntimeError("Tag, main APP_VERSION and release version must match")
     notes = command("git", "show", f"{tag}:release-notes/{version}.md")
@@ -47,21 +48,31 @@ def main():
     note_file.parent.mkdir(exist_ok=True)
     note_file.write_text(notes, encoding="utf-8")
     view = ["gh", "release", "view", tag, "--repo", REPOSITORY,
-            "--json", "isDraft,assets,tagName"]
+            "--json", "isDraft,assets,tagName,body"]
     existing = subprocess.run(view, cwd=ROOT, text=True, capture_output=True)
     if existing.returncode:
+        if sync_notes:
+            raise RuntimeError("Cannot sync notes without an existing public release")
         command("gh", "release", "create", tag, "--repo", REPOSITORY,
                 "--verify-tag", "--draft", "--title", f"Image Motion Tool V{version}",
                 "--notes-file", str(note_file))
         is_draft = True
     else:
         is_draft = json.loads(existing.stdout)["isDraft"]
+    if sync_notes:
+        if is_draft:
+            raise RuntimeError("Note synchronization cannot publish a draft release")
+        notes = (ROOT / "release-notes" / f"{version}.md").read_text(encoding="utf-8")
+        note_file.write_text(notes, encoding="utf-8")
+        command("gh", "release", "edit", tag, "--repo", REPOSITORY,
+                "--notes-file", str(note_file))
     if is_draft:
         command("gh", "release", "upload", tag, str(executable), notice_zip,
                 "--repo", REPOSITORY, "--clobber")
         command("gh", "release", "edit", tag, "--repo", REPOSITORY,
                 "--draft=false", "--latest")
     published = json.loads(command(*view))
+    notes = published["body"]
     expected_url = f"https://github.com/{REPOSITORY}/releases/download/{tag}/ImageMotionTool.exe"
     assets = {asset["name"]: asset for asset in published["assets"]}
     if published["isDraft"] or published["tagName"] != tag:

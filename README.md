@@ -77,6 +77,20 @@ Per ripetere solo il controllo della compatibilità dopo una modifica alla pipel
 un commit su `main` con `[verify-updater]` nel messaggio abilita nuovamente il job
 dopo la build. I dettagli diagnostici sono disponibili nel riepilogo del job.
 
+Il controllo ha confermato un difetto nella V5.14 pubblicata: il suo BAT con soli
+CR non sostituisce l'EXE, pur riuscendo a scaricare la V5.15. Il controllo
+comparativo dell'updater CRLF della V5.15 passa: sostituzione e riavvio verificati.
+Il job di compatibilità segnala quindi errore; i job di build e pubblicazione
+sono riusciti. Per passare dalla V5.14 serve una sola sostituzione manuale iniziale
+dell'EXE con quello della V5.15. Il codice della vecchia copia già installata non
+può essere corretto dal repository.
+
+Per correggere le note di una release già pubblicata, aggiornare il relativo
+file `release-notes/<versione>.md` e inviare su `main` un commit con
+`[sync-release-notes]` nel messaggio. Il workflow sincronizza le note della release
+e quelle di `version.json` senza sostituire gli asset pubblicati. Il tag e
+`APP_VERSION` devono ancora corrispondere alla versione interessata.
+
 Non modificare `version.json` prima della disponibilità dell'eseguibile: la V5.14
 legge questo file per proporre e scaricare l'aggiornamento. Il nome dell'asset
 rimane stabile (`ImageMotionTool.exe`), mentre la versione è interna all'app.
