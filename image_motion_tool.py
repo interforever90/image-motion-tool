@@ -10,7 +10,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-APP_VERSION = "5.17"
+APP_VERSION = "5.18"
 VERSION_URL = "https://raw.githubusercontent.com/interforever90/image-motion-tool/main/version.json"
 
 EFFECTS = [
@@ -234,7 +234,7 @@ class App:
         log=tempfile.NamedTemporaryFile(delete=False,suffix=".log"); log.close()
         try:
             with open(log.name,"wb") as err:
-                p=subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=err,text=True,bufsize=1)
+                p=subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=err,text=True,bufsize=1,creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
                 self.current_process=p
                 for line in p.stdout:
                     if self.cancel_event.is_set():
