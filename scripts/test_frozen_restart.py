@@ -10,6 +10,8 @@ from pathlib import Path
 from smoke_windows import application_window_exists
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from image_motion_tool import APP_VERSION
 
 
 def main():
@@ -38,7 +40,7 @@ def main():
                 if (not old.exists() and extractions
                         and any((p / "python312.dll").is_file() and
                                 (p / "ffmpeg.exe").is_file() for p in extractions)
-                        and application_window_exists("5.17")):
+                        and application_window_exists(APP_VERSION)):
                     assert not (work / "replacement.exe").exists(), "Replacement not moved"
                     assert installed.stat().st_size == (ROOT / "dist" / "ImageMotionTool.exe").stat().st_size
                     print("PASS: frozen updater replaced EXE; old extraction deleted; new GUI, Python and FFmpeg ready")
