@@ -10,7 +10,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-APP_VERSION = "5.16"
+APP_VERSION = "5.17"
 VERSION_URL = "https://raw.githubusercontent.com/interforever90/image-motion-tool/main/version.json"
 
 EFFECTS = [
@@ -302,7 +302,9 @@ class App:
         bat=Path(tempfile.gettempdir())/"ImageMotionTool_apply_update.bat"
         lines=["@echo off","setlocal","set /a tries=0",":retry","timeout /t 1 /nobreak >nul",f'move /y "{new}" "{old}" >nul 2>&1',"if %errorlevel%==0 goto done","set /a tries+=1","if %tries% LSS 30 goto retry","exit /b 1",":done",f'start "" "{old}"','del "%~f0"']
         bat.write_text("\r\n".join(lines)+"\r\n",encoding="utf-8",newline="")
-        subprocess.Popen(["cmd","/c","start","",str(bat)],creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+        # A restarted onefile EXE needs its own extraction directory after we exit.
+        env=dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT="1")
+        subprocess.Popen(["cmd","/c","start","",str(bat)],env=env,creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
         self.root.after(150,self.root.destroy)
 
 if __name__=="__main__":
