@@ -87,11 +87,22 @@ dopo la build. I dettagli diagnostici sono disponibili nel riepilogo del job.
 
 Il controllo ha confermato un difetto nella V5.14 pubblicata: il suo BAT con soli
 CR non sostituisce l'EXE, pur riuscendo a scaricare la V5.15. Il controllo
-comparativo dell'updater CRLF della V5.15 passa: sostituzione e riavvio verificati.
+comparativo dell'updater CRLF della V5.15 passa quando il metodo viene invocato
+da Python, ma non copriva l'ambiente ereditato da un vero processo PyInstaller.
 Il job di compatibilità segnala quindi errore; i job di build e pubblicazione
 sono riusciti. Per passare dalla V5.14 serve una sola sostituzione manuale iniziale
 dell'EXE con quello della V5.15. Il codice della vecchia copia già installata non
 può essere corretto dal repository.
+
+La V5.17 corregge il riavvio dell'updater impostando
+`PYINSTALLER_RESET_ENVIRONMENT=1` sul processo di aggiornamento. Ogni build
+esegue ora `scripts/test_frozen_restart.py`: un vero EXE onefile richiama il
+metodo di aggiornamento, si sostituisce con l'app compilata e termina. Il test
+verifica che la vecchia cartella di estrazione sia eliminata e la nuova GUI si
+apra con Python e FFmpeg in una cartella indipendente. Non modifica il rendering.
+Nel primo aggiornamento da V5.15/V5.16 il vecchio updater può ancora mostrare
+«Failed to load Python DLL»: riaprire l'EXE dalla sua cartella oppure scaricare
+direttamente V5.17. Gli aggiornamenti successivi usano il riavvio corretto.
 
 Per correggere le note di una release già pubblicata, aggiornare il relativo
 file `release-notes/<versione>.md` e inviare su `main` un commit con
