@@ -10,7 +10,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-APP_VERSION = "5.15"
+APP_VERSION = "5.16"
 VERSION_URL = "https://raw.githubusercontent.com/interforever90/image-motion-tool/main/version.json"
 
 EFFECTS = [
@@ -24,7 +24,8 @@ class App:
     def __init__(self, root):
         self.root=root
         root.title(f"Image Motion Tool {APP_VERSION} — Auto Updater")
-        root.geometry("900x720")
+        root.geometry("1080x780")
+        root.minsize(980,740)
         self.images=[]
         self.current_process=None
         self.cancel_event=threading.Event()
@@ -42,35 +43,123 @@ class App:
         self.progress=tk.DoubleVar(value=0)
         self.build_ui()
 
+    def configure_styles(self):
+        bg, card, field = "#0b1220", "#141e30", "#0d1728"
+        text, muted, accent = "#e9eff9", "#a5b2c8", "#5eead4"
+        self.root.configure(background=bg)
+        style = ttk.Style(self.root)
+        style.theme_use("clam")
+        style.configure(".", font=("Segoe UI", 10), background=card, foreground=text)
+        style.configure("Page.TFrame", background=bg)
+        style.configure("Card.TFrame", background=card)
+        style.configure("Page.TLabel", background=bg, foreground=text)
+        style.configure("Title.TLabel", background=bg, foreground=text, font=("Segoe UI", 23, "bold"))
+        style.configure("Subtitle.TLabel", background=bg, foreground=muted)
+        style.configure("Card.TLabel", background=card, foreground=text)
+        style.configure("Hint.TLabel", background=card, foreground=muted, font=("Segoe UI", 9))
+        style.configure("Version.TLabel", background="#183339", foreground=accent, padding=(12, 6))
+        style.configure("Card.TLabelframe", background=card, bordercolor="#28354b", relief="solid", borderwidth=1)
+        style.configure("Card.TLabelframe.Label", background=card, foreground=text, font=("Segoe UI", 11, "bold"))
+        style.configure("TEntry", fieldbackground=field, foreground=text, insertcolor=text,
+                        bordercolor="#34445f", lightcolor=field, darkcolor=field, padding=6)
+        style.configure("TCombobox", fieldbackground=field, background="#24334b", foreground=text,
+                        arrowcolor=accent, bordercolor="#34445f", padding=6)
+        style.map("TCombobox", fieldbackground=[("readonly", field)],
+                  foreground=[("readonly", text)], selectbackground=[("readonly", field)],
+                  selectforeground=[("readonly", text)])
+        style.configure("TButton", background="#24334b", foreground=text, borderwidth=0,
+                        padding=(13, 8), focusthickness=2, focuscolor=accent)
+        style.map("TButton", background=[("pressed", "#344762"), ("active", "#30425e")])
+        style.configure("Primary.TButton", background=accent, foreground="#072c29",
+                        font=("Segoe UI", 11, "bold"), padding=(22, 10))
+        style.map("Primary.TButton", background=[("pressed", "#2dd4bf"), ("active", "#99f6e4")])
+        style.configure("Cancel.TButton", foreground="#fda4af")
+        style.configure("TScrollbar", background="#34445f", troughcolor=field, borderwidth=0, arrowcolor=muted)
+        style.configure("TProgressbar", background=accent, troughcolor=field, borderwidth=0, thickness=7)
+        self.root.option_add("*TCombobox*Listbox.background", field)
+        self.root.option_add("*TCombobox*Listbox.foreground", text)
+        self.root.option_add("*TCombobox*Listbox.selectBackground", "#234d57")
+        self.root.option_add("*TCombobox*Listbox.selectForeground", text)
+
     def build_ui(self):
-        f=ttk.Frame(self.root,padding=12); f.pack(fill="both",expand=True)
-        self.listbox=tk.Listbox(f,height=10); self.listbox.pack(fill="both",expand=True)
-        b=ttk.Frame(f); b.pack(fill="x",pady=6)
-        ttk.Button(b,text="Aggiungi immagini",command=self.add_images).pack(side="left")
-        ttk.Button(b,text="Rimuovi",command=self.remove_selected).pack(side="left",padx=4)
-        ttk.Button(b,text="Svuota",command=self.clear_images).pack(side="left")
-        opts=ttk.LabelFrame(f,text="Impostazioni",padding=8); opts.pack(fill="x",pady=6)
-        self.row(opts,"Movimento",ttk.Combobox(opts,textvariable=self.effect,values=EFFECTS,state="readonly",width=28),0)
-        self.row(opts,"Preset",ttk.Combobox(opts,textvariable=self.preset,values=list(PRESETS),state="readonly",width=20),1)
-        self.row(opts,"Durata (s)",ttk.Entry(opts,textvariable=self.duration,width=10),2)
-        self.row(opts,"Risoluzione",ttk.Combobox(opts,textvariable=self.res,values=["1280x720","1920x1080","2560x1440","3840x2160"],state="readonly",width=16),3)
-        self.row(opts,"FPS",ttk.Combobox(opts,textvariable=self.fps,values=["24","25","30","50","60"],state="readonly",width=10),4)
-        self.row(opts,"Zoom %",ttk.Entry(opts,textvariable=self.zoom_strength,width=10),5)
-        self.row(opts,"Pan/Tilt %",ttk.Entry(opts,textvariable=self.move_strength,width=10),6)
-        self.row(opts,"Cartella output",ttk.Entry(opts,textvariable=self.output_dir,width=55),7)
-        ttk.Button(opts,text="Sfoglia",command=self.choose_output).grid(row=7,column=2,padx=4)
-        self.row(opts,"Nome singolo",ttk.Entry(opts,textvariable=self.filename,width=30),8)
-        self.row(opts,"Prefisso batch",ttk.Entry(opts,textvariable=self.prefix,width=30),9)
-        actions=ttk.Frame(f); actions.pack(fill="x",pady=8)
-        ttk.Button(actions,text="ANTEPRIMA",command=self.preview).pack(side="left")
-        ttk.Button(actions,text="ANNULLA",command=self.cancel).pack(side="left",padx=5)
-        ttk.Button(actions,text="GENERA",command=self.generate).pack(side="left")
-        ttk.Button(actions,text="AGGIORNAMENTI",command=self.check_update).pack(side="right")
-        ttk.Progressbar(f,variable=self.progress,maximum=100).pack(fill="x")
-        ttk.Label(f,textvariable=self.status).pack(anchor="w",pady=5)
+        self.configure_styles()
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(1, weight=1)
+        header=ttk.Frame(self.root,style="Page.TFrame",padding=(24,18,24,14))
+        header.grid(row=0,column=0,sticky="ew")
+        header.columnconfigure(0,weight=1)
+        ttk.Label(header,text="Image Motion Tool",style="Title.TLabel").grid(row=0,column=0,sticky="w")
+        ttk.Label(header,text="Trasforma le tue immagini in movimento.",style="Subtitle.TLabel").grid(row=1,column=0,sticky="w",pady=(3,0))
+        ttk.Label(header,text=f"V{APP_VERSION}",style="Version.TLabel").grid(row=0,column=1,padx=(12,14))
+        ttk.Button(header,text="Aggiornamenti",command=self.check_update).grid(row=0,column=2)
+
+        content=ttk.Frame(self.root,style="Page.TFrame",padding=(24,0,24,0))
+        content.grid(row=1,column=0,sticky="nsew")
+        content.columnconfigure(0,weight=5,uniform="panels")
+        content.columnconfigure(1,weight=6,uniform="panels")
+        content.rowconfigure(0,weight=1)
+        images=ttk.LabelFrame(content,text="  Immagini  ",style="Card.TLabelframe",padding=16)
+        images.grid(row=0,column=0,sticky="nsew",padx=(0,16))
+        images.columnconfigure(0,weight=1)
+        images.rowconfigure(1,weight=1)
+        ttk.Label(images,text="Aggiungi le immagini nell’ordine desiderato.",style="Hint.TLabel").grid(row=0,column=0,columnspan=2,sticky="w",pady=(0,12))
+        self.listbox=tk.Listbox(images,height=10,background="#0d1728",foreground="#e9eff9",
+                               selectbackground="#234d57",selectforeground="#ffffff",font=("Segoe UI",10),
+                               highlightthickness=1,highlightbackground="#28354b",highlightcolor="#5eead4",
+                               relief="flat",borderwidth=0,activestyle="none")
+        self.listbox.grid(row=1,column=0,sticky="nsew")
+        scroll=ttk.Scrollbar(images,orient="vertical",command=self.listbox.yview)
+        scroll.grid(row=1,column=1,sticky="ns")
+        self.listbox.configure(yscrollcommand=scroll.set)
+        image_actions=ttk.Frame(images,style="Card.TFrame")
+        image_actions.grid(row=2,column=0,columnspan=2,sticky="ew",pady=(12,0))
+        ttk.Button(image_actions,text="+ Aggiungi immagini",command=self.add_images).pack(fill="x")
+        edit=ttk.Frame(images,style="Card.TFrame")
+        edit.grid(row=3,column=0,columnspan=2,sticky="ew",pady=(8,0))
+        edit.columnconfigure((0,1),weight=1)
+        ttk.Button(edit,text="Rimuovi selezione",command=self.remove_selected).grid(row=0,column=0,sticky="ew",padx=(0,4))
+        ttk.Button(edit,text="Svuota elenco",command=self.clear_images).grid(row=0,column=1,sticky="ew",padx=(4,0))
+
+        settings=ttk.Frame(content,style="Page.TFrame")
+        settings.grid(row=0,column=1,sticky="nsew")
+        settings.columnconfigure(0,weight=1)
+        movement=ttk.LabelFrame(settings,text="  Movimento e intensità  ",style="Card.TLabelframe",padding=(14,8))
+        movement.grid(row=0,column=0,sticky="ew",pady=(0,12))
+        movement.columnconfigure(1,weight=1)
+        self.row(movement,"Effetto",ttk.Combobox(movement,textvariable=self.effect,values=EFFECTS,state="readonly",width=25),0)
+        self.row(movement,"Preset",ttk.Combobox(movement,textvariable=self.preset,values=list(PRESETS),state="readonly"),1)
+        self.row(movement,"Zoom (%)",ttk.Entry(movement,textvariable=self.zoom_strength),2)
+        self.row(movement,"Pan / Tilt (%)",ttk.Entry(movement,textvariable=self.move_strength),3)
+        video=ttk.LabelFrame(settings,text="  Video  ",style="Card.TLabelframe",padding=(14,8))
+        video.grid(row=1,column=0,sticky="ew",pady=(0,12))
+        video.columnconfigure(1,weight=1)
+        self.row(video,"Durata (secondi)",ttk.Combobox(video,textvariable=self.duration,values=["7","10","15","30","60","120"],state="normal"),0)
+        self.row(video,"Risoluzione",ttk.Combobox(video,textvariable=self.res,values=["1280x720","1920x1080","2560x1440","3840x2160"],state="readonly"),1)
+        self.row(video,"FPS",ttk.Combobox(video,textvariable=self.fps,values=["24","25","30","50","60"],state="readonly"),2)
+        ttk.Label(video,text="Durata libera, anche oltre 120 s. Anteprima: massimo 5 s.",style="Hint.TLabel").grid(row=3,column=0,columnspan=2,sticky="w",pady=(6,2))
+        export=ttk.LabelFrame(settings,text="  Esportazione  ",style="Card.TLabelframe",padding=(14,8))
+        export.grid(row=2,column=0,sticky="ew")
+        export.columnconfigure(1,weight=1)
+        self.row(export,"Cartella",ttk.Entry(export,textvariable=self.output_dir,width=20),0)
+        ttk.Button(export,text="Sfoglia",command=self.choose_output).grid(row=0,column=2,padx=(8,0))
+        self.row(export,"Nome singolo",ttk.Entry(export,textvariable=self.filename),1)
+        self.row(export,"Prefisso batch",ttk.Entry(export,textvariable=self.prefix),2)
+
+        footer=ttk.Frame(self.root,style="Page.TFrame",padding=(24,16,24,18))
+        footer.grid(row=2,column=0,sticky="ew")
+        footer.columnconfigure(0,weight=1)
+        actions=ttk.Frame(footer,style="Page.TFrame")
+        actions.grid(row=0,column=0,sticky="ew",pady=(0,12))
+        ttk.Button(actions,text="Anteprima",command=self.preview).pack(side="left")
+        ttk.Button(actions,text="Annulla",style="Cancel.TButton",command=self.cancel).pack(side="left",padx=8)
+        ttk.Button(actions,text="Genera video",style="Primary.TButton",command=self.generate).pack(side="right")
+        ttk.Progressbar(footer,variable=self.progress,maximum=100).grid(row=1,column=0,sticky="ew")
+        ttk.Label(footer,textvariable=self.status,style="Subtitle.TLabel").grid(row=2,column=0,sticky="w",pady=(7,0))
         self.preset.trace_add("write",lambda *_:self.apply_preset())
+
     def row(self,p,label,widget,r):
-        ttk.Label(p,text=label).grid(row=r,column=0,sticky="w",pady=3); widget.grid(row=r,column=1,sticky="w",pady=3)
+        ttk.Label(p,text=label,style="Card.TLabel").grid(row=r,column=0,sticky="w",padx=(0,12),pady=4)
+        widget.grid(row=r,column=1,sticky="ew",pady=4)
     def add_images(self):
         fs=filedialog.askopenfilenames(filetypes=[("Immagini","*.jpg *.jpeg *.png *.webp *.bmp")])
         for x in fs:
