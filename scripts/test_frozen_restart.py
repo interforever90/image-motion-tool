@@ -30,7 +30,9 @@ def main():
         shutil.copy2(work / "dist" / installed.name, installed)
         shutil.copy2(ROOT / "dist" / "ImageMotionTool.exe", work / "replacement.exe")
         env = dict(os.environ, TEMP=str(work), TMP=str(work))
-        process = subprocess.Popen([str(installed), str(work)], cwd=work, env=env)
+        # The updater's Windows command shell can retain its working directory.
+        # Keep that outside the temporary extraction directory being removed.
+        process = subprocess.Popen([str(installed), str(work)], cwd=ROOT, env=env)
         try:
             assert process.wait(timeout=90) == 0, "Original frozen updater failed"
             old = Path(work.joinpath("old-extraction.txt").read_text(encoding="utf-8"))
