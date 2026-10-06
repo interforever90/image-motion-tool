@@ -10,7 +10,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-APP_VERSION = "5.20"
+APP_VERSION = "5.21"
 VERSION_URL = "https://raw.githubusercontent.com/interforever90/image-motion-tool/main/version.json"
 
 EFFECTS = [
@@ -236,7 +236,7 @@ class App:
         if preview:self.duration.set(str(dur));self.res.set("1280x720");self.fps.set("24")
         vf=self.filter(effect)
         if preview:self.duration.set(olddur);self.res.set(oldres);self.fps.set(oldfps)
-        cmd=[self.ffmpeg(),"-y","-loop","1","-i",src,"-vf",vf,"-t",str(dur),"-c:v","libx264","-preset","ultrafast" if preview else "veryfast","-crf","25" if preview else "17","-pix_fmt","yuv420p","-movflags","+faststart","-progress","pipe:1","-nostats",str(out)]
+        cmd=[self.ffmpeg(),"-y","-filter_threads","2","-loop","1","-i",src,"-vf",vf,"-t",str(dur),"-c:v","libx264","-threads","2","-preset","ultrafast" if preview else "veryfast","-crf","25" if preview else "17","-pix_fmt","yuv420p","-movflags","+faststart","-progress","pipe:1","-nostats",str(out)]
         log=tempfile.NamedTemporaryFile(delete=False,suffix=".log"); log.close()
         try:
             with open(log.name,"wb") as err:

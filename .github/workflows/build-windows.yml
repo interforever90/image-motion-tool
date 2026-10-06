@@ -39,6 +39,8 @@ jobs:
           image_motion_tool.py
       - name: Validate packaged application and FFmpeg
         run: python scripts/smoke_windows.py
+      - name: Verify three-image Full HD batch with limited memory usage
+        run: python scripts/test_fullhd_batch_windows.py
       - name: Verify update restart from a real frozen process
         run: python scripts/test_frozen_restart.py
       - name: Upload Windows executable and FFmpeg notices
