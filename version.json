@@ -1,5 +1,5 @@
 {
-  "version": "5.12",
-  "download_url": "https://github.com/interforever90/image-motion-tool/releases/download/v5.12/ImageMotionTool_V5_12.exe",
-  "notes": "V5.12 - Correzione sperimentale del Test Adattivo e sistema di aggiornamento."
+  "version": "5.14",
+  "download_url": "https://github.com/interforever90/image-motion-tool/releases/download/v5.14/ImageMotionTool_V5_14.exe",
+  "notes": "V5.14 - Nuovo sistema di aggiornamento con sostituzione e riavvio automatici."
 }
