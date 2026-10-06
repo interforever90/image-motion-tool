@@ -1,5 +1,7 @@
 """Verify replacement and restart after the old onefile extraction is deleted."""
 import os
+import ctypes
+from ctypes import wintypes
 import shutil
 import subprocess
 import sys
@@ -12,6 +14,28 @@ from smoke_windows import application_window_exists
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from image_motion_tool import APP_VERSION
+
+
+def wait_for_updater_exit(pid):
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel.WaitForSingleObject.restype = wintypes.DWORD
+    kernel.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel.OpenProcess(0x100000 | 0x1000, False, pid)
+    if not handle:
+        if ctypes.get_last_error() == 87:  # Process already gone.
+            return
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        assert kernel.WaitForSingleObject(handle, 15000) == 0, "Updater command shell remained open"
+        code = wintypes.DWORD()
+        assert kernel.GetExitCodeProcess(handle, ctypes.byref(code)), "Cannot inspect updater exit"
+        assert code.value == 0, f"Updater exited with error {code.value}"
+    finally:
+        kernel.CloseHandle(handle)
 
 
 def main():
@@ -30,9 +54,8 @@ def main():
         shutil.copy2(work / "dist" / installed.name, installed)
         shutil.copy2(ROOT / "dist" / "ImageMotionTool.exe", work / "replacement.exe")
         env = dict(os.environ, TEMP=str(work), TMP=str(work))
-        # The updater's Windows command shell can retain its working directory.
-        # Keep that outside the temporary extraction directory being removed.
-        process = subprocess.Popen([str(installed), str(work)], cwd=ROOT, env=env)
+        # Also verify the updater releases its working directory on completion.
+        process = subprocess.Popen([str(installed), str(work)], cwd=work, env=env)
         try:
             assert process.wait(timeout=90) == 0, "Original frozen updater failed"
             old = Path(work.joinpath("old-extraction.txt").read_text(encoding="utf-8"))
@@ -45,7 +68,9 @@ def main():
                         and application_window_exists(APP_VERSION)):
                     assert not (work / "replacement.exe").exists(), "Replacement not moved"
                     assert installed.stat().st_size == (ROOT / "dist" / "ImageMotionTool.exe").stat().st_size
-                    print("PASS: frozen updater replaced EXE; old extraction deleted; new GUI, Python and FFmpeg ready")
+                    wait_for_updater_exit(int(work.joinpath("updater-pid.txt").read_text()))
+                    assert not (work / "ImageMotionTool_apply_update.bat").exists(), "Updater BAT not removed"
+                    print("PASS: frozen update restarted; independent runtime ready; BAT removed and command shell closed")
                     return
                 time.sleep(0.5)
             raise RuntimeError("Updated EXE did not restart with independent Python/FFmpeg extraction")
