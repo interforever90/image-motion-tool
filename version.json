@@ -1,5 +1,5 @@
 {
-  "version": "5.18",
-  "download_url": "https://github.com/interforever90/image-motion-tool/releases/download/v5.18/ImageMotionTool.exe",
-  "notes": "V5.18 - FFmpeg viene avviato senza una finestra console su Windows: premendo Genera video o Anteprima non compare più la finestra nera del terminale.\n\nComando FFmpeg, formule di movimento, filtri, oversampling, scaling, preset, CRF, FPS e qualità del rendering invariati. Log degli errori, annullamento e aggiornamento automatico conservati.\n\nVerifiche Windows: avvio dell'EXE standalone, FFmpeg incorporato, generazione di un MP4 da 15 secondi e sostituzione/riavvio dell'app da un vero processo PyInstaller."
+  "version": "5.19",
+  "download_url": "https://github.com/interforever90/image-motion-tool/releases/download/v5.19/ImageMotionTool.exe",
+  "notes": "V5.19 - Avanzamento durante la generazione: la barra segue i dati reali di FFmpeg anche all'interno del singolo video. Mostra la percentuale totale e, nel messaggio di stato, il numero del video e la percentuale del video corrente. Una nuova generazione riparte da zero; il 100% viene indicato solo dopo la conclusione riuscita del processo.\n\nNotifica aggiornamenti automatica: controllo discreto all'apertura e ogni 30 minuti. Quando è disponibile una nuova versione, il pulsante si evidenzia e mostra «Aggiorna · V…». Nessun download automatico e nessuna finestra d'errore per i controlli in background senza connessione. Il pulsante conserva il controllo manuale e la scelta di scaricare/installare.\n\nVerificati avanzamento intermedio e completamento con FFmpeg su Windows, percentuale batch, annullamento/errori e notifiche aggiornamenti. Formule di movimento, filtri, oversampling, scaling, preset, CRF, x264 e FPS invariati."
 }
