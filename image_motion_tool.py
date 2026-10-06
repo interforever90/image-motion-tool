@@ -10,7 +10,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-APP_VERSION = "5.18"
+APP_VERSION = "5.19"
 VERSION_URL = "https://raw.githubusercontent.com/interforever90/image-motion-tool/main/version.json"
 
 EFFECTS = [
@@ -43,7 +43,11 @@ class App:
         self.prefix=tk.StringVar(value="")
         self.status=tk.StringVar(value="Pronto")
         self.progress=tk.DoubleVar(value=0)
+        self.progress_text=tk.StringVar(value="0%")
+        self.update_check_running=False
+        self.update_download_running=False
         self.build_ui()
+        self.root.after(2000,self._poll_updates)
 
     def configure_styles(self):
         bg, card, field = "#0b1220", "#141e30", "#0d1728"
@@ -93,7 +97,8 @@ class App:
         ttk.Label(header,text="Image Motion Tool",style="Title.TLabel").grid(row=0,column=0,sticky="w")
         ttk.Label(header,text="Trasforma le tue immagini in movimento.",style="Subtitle.TLabel").grid(row=1,column=0,sticky="w",pady=(3,0))
         ttk.Label(header,text=f"V{APP_VERSION}",style="Version.TLabel").grid(row=0,column=1,padx=(12,14))
-        ttk.Button(header,text="Aggiornamenti",command=self.check_update).grid(row=0,column=2)
+        self.update_button=ttk.Button(header,text="Aggiornamenti",command=self.check_update)
+        self.update_button.grid(row=0,column=2)
 
         content=ttk.Frame(self.root,style="Page.TFrame",padding=(24,0,24,0))
         content.grid(row=1,column=0,sticky="nsew")
@@ -162,12 +167,13 @@ class App:
         footer.grid(row=2,column=0,sticky="ew")
         footer.columnconfigure(0,weight=1)
         actions=ttk.Frame(footer,style="Page.TFrame")
-        actions.grid(row=0,column=0,sticky="ew",pady=(0,12))
+        actions.grid(row=0,column=0,columnspan=2,sticky="ew",pady=(0,12))
         ttk.Button(actions,text="Anteprima",command=self.preview).pack(side="left")
         ttk.Button(actions,text="Annulla",style="Cancel.TButton",command=self.cancel).pack(side="left",padx=8)
         ttk.Button(actions,text="Genera video",style="Primary.TButton",command=self.generate).pack(side="right")
         ttk.Progressbar(footer,variable=self.progress,maximum=100).grid(row=1,column=0,sticky="ew")
-        ttk.Label(footer,textvariable=self.status,style="Subtitle.TLabel").grid(row=2,column=0,sticky="w",pady=(7,0))
+        ttk.Label(footer,textvariable=self.progress_text,style="Page.TLabel",width=5,anchor="e").grid(row=1,column=1,padx=(10,0))
+        ttk.Label(footer,textvariable=self.status,style="Subtitle.TLabel").grid(row=2,column=0,columnspan=2,sticky="w",pady=(7,0))
         self.preset.trace_add("write",lambda *_:self.apply_preset())
 
     def row(self,p,label,widget,r):
@@ -224,7 +230,7 @@ class App:
         p=out/(stem+".mp4"); n=2
         while p.exists():p=out/f"{stem}_{n}.mp4";n+=1
         return p
-    def run_one(self,src,out,effect,preview=False):
+    def run_one(self,src,out,effect,preview=False,on_progress=None):
         dur=min(float(self.duration.get()),5) if preview else float(self.duration.get())
         olddur=self.duration.get(); oldres=self.res.get(); oldfps=self.fps.get()
         if preview:self.duration.set(str(dur));self.res.set("1280x720");self.fps.set("24")
@@ -236,18 +242,32 @@ class App:
             with open(log.name,"wb") as err:
                 p=subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=err,text=True,bufsize=1,creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
                 self.current_process=p
+                last_percent=-1
                 for line in p.stdout:
                     if self.cancel_event.is_set():
                         p.terminate(); break
+                    key,_,value=line.strip().partition("=")
+                    if on_progress and key=="out_time_us":
+                        try:fraction=max(0,min(.99,int(value)/1_000_000/dur))
+                        except (ValueError,ZeroDivisionError):continue
+                        percent=int(fraction*100)
+                        if percent>last_percent:
+                            last_percent=percent; on_progress(fraction)
                 rc=p.wait()
             if rc and not self.cancel_event.is_set(): raise RuntimeError(Path(log.name).read_text(errors="ignore")[-4000:])
+            if rc==0 and not self.cancel_event.is_set() and on_progress:on_progress(1.0)
         finally:
             self.current_process=None
             try:os.unlink(log.name)
             except:pass
     def generate(self):
         if not self.images:return messagebox.showwarning("Attenzione","Aggiungi almeno un'immagine.")
+        self.progress.set(0); self.progress_text.set("0%"); self.status.set("Preparazione del video…")
         self.cancel_event.clear(); threading.Thread(target=self._generate_worker,daemon=True).start()
+    def _show_progress(self,fraction,index,total,effect):
+        overall=(index-1+fraction)/total*100
+        self.progress.set(overall); self.progress_text.set(f"{int(overall)}%")
+        self.status.set(f"Video {index}/{total}: {effect} — {int(fraction*100)}% del video")
     def _generate_worker(self):
         start=time.time(); total=len(self.images)
         try:
@@ -255,13 +275,16 @@ class App:
                 if self.cancel_event.is_set():break
                 effect=random.choice(MANUAL_EFFECTS[:-2]) if self.effect.get()=="Automatico" else self.effect.get()
                 out=self.outname(src,i,total); t0=time.time()
-                self.root.after(0,lambda i=i,effect=effect:self.status.set(f"Video {i}/{total}: {effect}"))
-                self.run_one(src,out,effect)
+                def report(fraction,i=i,effect=effect):
+                    self.root.after(0,lambda fraction=fraction,i=i,effect=effect:self._show_progress(fraction,i,total,effect))
+                report(0)
+                self.run_one(src,out,effect,on_progress=report)
                 elapsed=time.time()-t0
-                self.root.after(0,lambda i=i,elapsed=elapsed:self.progress.set(i/total*100))
             elapsed=time.time()-start
             self.root.after(0,lambda:self.status.set("Annullato" if self.cancel_event.is_set() else f"Completato in {elapsed:.1f} s"))
-        except Exception as ex:self.root.after(0,lambda ex=ex:messagebox.showerror("Errore",str(ex)))
+        except Exception as ex:
+            self.root.after(0,lambda:self.status.set("Generazione interrotta per un errore"))
+            self.root.after(0,lambda ex=ex:messagebox.showerror("Errore",str(ex)))
     def preview(self):
         if not self.images:return messagebox.showwarning("Attenzione","Aggiungi almeno un'immagine.")
         def w():
@@ -278,24 +301,50 @@ class App:
     @staticmethod
     def _version_tuple(v):
         return tuple(int(x) for x in str(v).strip().lstrip("vV").split("."))
-    def check_update(self):
+    def _poll_updates(self):
+        self.check_update(silent=True)
+        self.root.after(30*60*1000,self._poll_updates)
+    def check_update(self,silent=False):
+        if self.update_check_running or self.update_download_running:return
+        self.update_check_running=True
         def worker():
             try:
                 req=urllib.request.Request(VERSION_URL,headers={"User-Agent":f"ImageMotionTool/{APP_VERSION}"})
                 import json
                 with urllib.request.urlopen(req,timeout=15) as r:data=json.load(r)
-                if self._version_tuple(data["version"])<=self._version_tuple(APP_VERSION):
-                    self.root.after(0,lambda:messagebox.showinfo("Aggiornamenti","Hai già la versione più recente."));return
-                url=data.get("download_url",""); notes=data.get("notes","")
-                if not url:raise RuntimeError("URL di download non disponibile.")
-                if not messagebox.askyesno("Aggiornamento disponibile",f"Disponibile V{data['version']}.\n\n{notes}\n\nScaricarla?"):return
+                available=self._version_tuple(data["version"])>self._version_tuple(APP_VERSION)
+                if available and not data.get("download_url"):raise RuntimeError("URL di download non disponibile.")
+                self.root.after(0,lambda:self._update_checked(data,available,silent))
+            except Exception as ex:
+                self.root.after(0,lambda ex=ex:self._update_check_failed(ex,silent))
+        threading.Thread(target=worker,daemon=True).start()
+    def _update_check_failed(self,error,silent):
+        self.update_check_running=False
+        if not silent:messagebox.showerror("Aggiornamenti",str(error))
+    def _update_checked(self,data,available,silent):
+        self.update_check_running=False
+        self.update_button.configure(text=f"Aggiorna · V{data['version']}" if available else "Aggiornamenti",
+                                     style="Primary.TButton" if available else "TButton")
+        if silent:return
+        if not available:
+            messagebox.showinfo("Aggiornamenti","Hai già la versione più recente.");return
+        if not messagebox.askyesno("Aggiornamento disponibile",f"Disponibile V{data['version']}.\n\n{data.get('notes','')}\n\nScaricarla?"):return
+        self.update_download_running=True
+        self.update_button.configure(state="disabled",text="Download…")
+        def worker():
+            try:
                 d=Path(tempfile.gettempdir())/"ImageMotionToolUpdater"; d.mkdir(exist_ok=True)
                 new=d/"ImageMotionTool_NEW.exe"
-                urllib.request.urlretrieve(url,new)
+                urllib.request.urlretrieve(data["download_url"],new)
                 if new.stat().st_size<1_000_000:raise RuntimeError("Il file scaricato non sembra un eseguibile valido.")
-                self.root.after(0,lambda:self.apply_update(new))
-            except Exception as ex:self.root.after(0,lambda:messagebox.showerror("Aggiornamenti",str(ex)))
+                self.root.after(0,lambda:self._download_finished(data,new))
+            except Exception as ex:self.root.after(0,lambda ex=ex:self._download_finished(data,None,ex))
         threading.Thread(target=worker,daemon=True).start()
+    def _download_finished(self,data,new,error=None):
+        self.update_download_running=False
+        self.update_button.configure(state="normal",text=f"Aggiorna · V{data['version']}")
+        if error:messagebox.showerror("Aggiornamenti",str(error))
+        else:self.apply_update(new)
     def apply_update(self,new):
         if not messagebox.askyesno("Aggiornamento pronto","Download completato. Chiudere il programma, sostituire la versione corrente e riavviare automaticamente?"):return
         old=Path(sys.executable).resolve()

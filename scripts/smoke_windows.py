@@ -31,6 +31,10 @@ def check_long_duration(ffmpeg, work):
             time.sleep(0.05)
         else:
             raise RuntimeError("Source UI did not finish mapping before layout validation")
+        app._update_checked({"version": "99.0"}, True, True)
+        root.update_idletasks()
+        assert app.update_button.cget("text") == "Aggiorna · V99.0", "Update notification not visible"
+        assert app.update_button.cget("style") == "Primary.TButton", "Update button not highlighted"
         def check_widgets(parent):
             for widget in parent.winfo_children():
                 if isinstance(widget, (tk.Listbox,)) or widget.winfo_class() in ("TButton", "TEntry", "TCombobox"):
@@ -42,6 +46,7 @@ def check_long_duration(ffmpeg, work):
                         assert 0 <= y and y + widget.winfo_height() <= root.winfo_height(), f"{widget}: vertical clipping ({y}, {widget.winfo_height()}, {root.winfo_height()})"
                 check_widgets(widget)
         check_widgets(root)
+        app._update_checked({"version": "0.0"}, False, True)
         app.settings_canvas.yview_moveto(1)
         root.update_idletasks()
         assert app.settings_canvas.yview()[1] >= 0.999, "Export controls cannot be reached by scrolling"
@@ -56,7 +61,11 @@ def check_long_duration(ffmpeg, work):
             component for y in range(64) for x in range(64)
             for component in (x * 4, y * 4, 128)))
         output = work / "duration-15s.mp4"
-        app.run_one(str(image), output, "Zoom In")
+        progress = []
+        app.run_one(str(image), output, "Zoom In", on_progress=progress.append)
+        assert progress and progress[-1] == 1.0, "Rendering never reported successful completion"
+        assert any(0 < value < 1 for value in progress), "FFmpeg did not report progress before completion"
+        assert progress == sorted(progress), "Render progress went backwards"
         probe = subprocess.run([str(ffmpeg), "-hide_banner", "-i", str(output),
                                 "-map", "0:v:0", "-c", "copy", "-f", "null", "-"],
                                capture_output=True, text=True, check=True, timeout=30)
