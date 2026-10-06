@@ -1,5 +1,5 @@
 {
-  "version": "5.17",
-  "download_url": "https://github.com/interforever90/image-motion-tool/releases/download/v5.17/ImageMotionTool.exe",
-  "notes": "V5.17 - Corretto il riavvio dopo un aggiornamento: il nuovo EXE avvia una sessione PyInstaller indipendente, evitando l'errore «Failed to load Python DLL» dovuto alla cartella temporanea della vecchia versione.\n\nVerifica automatica Windows della sostituzione e del riavvio da un vero eseguibile PyInstaller, con eliminazione della vecchia cartella temporanea e avvio della nuova interfaccia con Python e FFmpeg incorporati.\n\nPer il primo passaggio da V5.15/V5.16, se il riavvio automatico mostra ancora l'errore, riaprire ImageMotionTool.exe dalla sua cartella: il vecchio updater non contiene ancora questa correzione. In alternativa scaricare direttamente l'EXE V5.17. I successivi aggiornamenti utilizzeranno il riavvio corretto.\n\nInterfaccia, durata video e logica di rendering invariati rispetto a V5.16."
+  "version": "5.18",
+  "download_url": "https://github.com/interforever90/image-motion-tool/releases/download/v5.18/ImageMotionTool.exe",
+  "notes": "V5.18 - FFmpeg viene avviato senza una finestra console su Windows: premendo Genera video o Anteprima non compare più la finestra nera del terminale.\n\nComando FFmpeg, formule di movimento, filtri, oversampling, scaling, preset, CRF, FPS e qualità del rendering invariati. Log degli errori, annullamento e aggiornamento automatico conservati.\n\nVerifiche Windows: avvio dell'EXE standalone, FFmpeg incorporato, generazione di un MP4 da 15 secondi e sostituzione/riavvio dell'app da un vero processo PyInstaller."
 }
