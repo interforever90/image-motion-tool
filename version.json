@@ -1,5 +1,5 @@
 {
   "version": "5.15",
   "download_url": "https://github.com/interforever90/image-motion-tool/releases/download/v5.15/ImageMotionTool.exe",
-  "notes": "V5.15 - Prima build automatica Windows standalone con FFmpeg incluso. Corretti i terminatori CRLF del BAT di aggiornamento. Rendering, effetti e preset invariati rispetto alla V5.14."
+  "notes": "V5.15 - Prima build automatica Windows standalone con FFmpeg incluso. Corretti i terminatori CRLF del BAT di aggiornamento. Logica di rendering, effetti e preset invariati rispetto al sorgente baseline V5.14.\n\nIMPORTANTE PER CHI USA V5.14: il vecchio updater scarica la nuova versione, ma il suo BAT con soli CR non riesce a sostituire e riavviare l'EXE. È necessaria una sola sostituzione manuale iniziale: chiudere V5.14 e sostituire il vecchio eseguibile con ImageMotionTool.exe della release V5.15. Non servono Python, FFmpeg separato, compilazioni o BAT manuali.\n\nIl metodo updater CRLF incluso nella V5.15 è stato verificato su Windows: sostituisce l'eseguibile e riavvia correttamente l'applicazione."
 }
